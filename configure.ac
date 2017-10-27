@@ -39,6 +39,7 @@ PKG_CHECK_MODULES(DRM, [libdrm >= 2.4.71])
 PKG_CHECK_MODULES(GBM, gbm >= 13.0)
 PKG_CHECK_MODULES(EGL, egl)
 PKG_CHECK_MODULES(GLES2, glesv2)
+PKG_CHECK_MODULES(PNG, libpng)
 
 # Check for gst and enable cube-video conditionally:
 PKG_CHECK_MODULES(GST, gstreamer-1.0 >= 1.6.0 gstreamer-plugins-base-1.0 >= 1.6.0 gstreamer-app-1.0 >= 1.6.0 gstreamer-allocators-1.0 >= 1.6.0 gstreamer-video-1.0 >= 1.6.0 glib-2.0,

@@ -28,6 +28,7 @@ kmscube_LDADD = \
 	$(GBM_LIBS) \
 	$(EGL_LIBS) \
 	$(GLES2_LIBS) \
+	$(PNG_LIBS) \
 	-lm
 
 kmscube_CFLAGS = \
@@ -37,7 +38,8 @@ kmscube_CFLAGS = \
 	$(DRM_CFLAGS) \
 	$(GBM_CFLAGS) \
 	$(EGL_CFLAGS) \
-	$(GLES2_CFLAGS)
+	$(GLES2_CFLAGS) \
+	$(PNG_CFLAGS)
 
 kmscube_SOURCES = \
 	common.c \
@@ -48,6 +50,7 @@ kmscube_SOURCES = \
 	drm-common.c \
 	drm-common.h \
 	drm-legacy.c \
+	dump.c \
 	esTransform.c \
 	esUtil.h \
 	frame-512x512-NV12.c \

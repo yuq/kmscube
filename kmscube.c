@@ -43,11 +43,12 @@ static const struct egl *egl;
 static const struct gbm *gbm;
 static const struct drm *drm;
 
-static const char *shortopts = "AD:M:m:V:";
+static const char *shortopts = "AD:dM:m:V:";
 
 static const struct option longopts[] = {
 	{"atomic", no_argument,       0, 'A'},
 	{"device", required_argument, 0, 'D'},
+	{"dump", no_argument, 0, 'd'},
 	{"mode",   required_argument, 0, 'M'},
 	{"modifier", required_argument, 0, 'm'},
 	{"video",  required_argument, 0, 'V'},
@@ -61,6 +62,7 @@ static void usage(const char *name)
 			"options:\n"
 			"    -A, --atomic             use atomic modesetting and fencing\n"
 			"    -D, --device=DEVICE      use the given device\n"
+			"    -d, --dump               dump frames to png files\n"
 			"    -M, --mode=MODE          specify mode, one of:\n"
 			"        smooth    -  smooth shaded cube (default)\n"
 			"        rgba      -  rgba textured cube\n"
@@ -77,8 +79,9 @@ int main(int argc, char *argv[])
 	const char *video = NULL;
 	enum mode mode = SMOOTH;
 	uint64_t modifier = DRM_FORMAT_MOD_INVALID;
-	int atomic = 0;
+	int atomic = 0, dump = 0;
 	int opt;
+	int fd, width, height;
 
 #ifdef HAVE_GST
 	gst_init(&argc, &argv);
@@ -92,6 +95,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'D':
 			device = optarg;
+			break;
+		case 'd':
+			dump = 1;
 			break;
 		case 'M':
 			if (strcmp(optarg, "smooth") == 0) {
@@ -121,17 +127,30 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (atomic)
-		drm = init_drm_atomic(device);
-	else
-		drm = init_drm_legacy(device);
-	if (!drm) {
-		printf("failed to initialize %s DRM\n", atomic ? "atomic" : "legacy");
-		return -1;
+	if (dump) {
+		width = DUMP_TARGET_SIZE;
+		height = DUMP_TARGET_SIZE;
+		fd = init_dump(device);
+		if (fd < 0) {
+			printf("failed to init dump device\n");
+			return -1;
+		}
+	}
+	else {
+		if (atomic)
+			drm = init_drm_atomic(device);
+		else
+			drm = init_drm_legacy(device);
+		if (!drm) {
+			printf("failed to initialize %s DRM\n", atomic ? "atomic" : "legacy");
+			return -1;
+		}
+		fd = drm->fd;
+		width = drm->mode->hdisplay;
+		height = drm->mode->vdisplay;
 	}
 
-	gbm = init_gbm(drm->fd, drm->mode->hdisplay, drm->mode->vdisplay,
-			modifier);
+	gbm = init_gbm(fd, width, height, modifier);
 	if (!gbm) {
 		printf("failed to initialize GBM\n");
 		return -1;
@@ -153,5 +172,8 @@ int main(int argc, char *argv[])
 	glClearColor(0.5, 0.5, 0.5, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	return drm->run(gbm, egl);
+	if (dump)
+		return dump_run(gbm, egl);
+	else
+		return drm->run(gbm, egl);
 }
