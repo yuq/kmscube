@@ -128,8 +128,8 @@ int main(int argc, char *argv[])
 	}
 
 	if (dump) {
-		width = DUMP_TARGET_SIZE;
-		height = DUMP_TARGET_SIZE;
+		width = DUMP_TARGET_WIDTH;
+		height = DUMP_TARGET_HEIGHT;
 		fd = init_dump(device);
 		if (fd < 0) {
 			printf("failed to init dump device\n");

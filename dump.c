@@ -122,12 +122,12 @@ int dump_run(const struct gbm *gbm, const struct egl *egl)
 		bo = gbm_surface_lock_front_buffer(gbm->surface);
 		assert(bo);
 
-		result = gbm_bo_map(bo, 0, 0, DUMP_TARGET_SIZE, DUMP_TARGET_SIZE,
+		result = gbm_bo_map(bo, 0, 0, DUMP_TARGET_WIDTH, DUMP_TARGET_HEIGHT,
 				    GBM_BO_TRANSFER_READ, &stride, &map_data);
 		assert(result);
-		assert(stride == DUMP_TARGET_SIZE * 4);
+		assert(stride == DUMP_TARGET_WIDTH * 4);
 
-		assert(!write_image(name, DUMP_TARGET_SIZE, DUMP_TARGET_SIZE,
+		assert(!write_image(name, DUMP_TARGET_WIDTH, DUMP_TARGET_HEIGHT,
 				    result, "dump"));
 		name[4]++;
 
