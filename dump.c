@@ -32,7 +32,8 @@
 
 #include <png.h>
 
-static int write_image(char* filename, int width, int height, void *buffer, char* title)
+static int write_image(char* filename, int width, int height, int stride,
+		       void *buffer, char* title)
 {
 	int code = 0;
 	FILE *fp = NULL;
@@ -91,7 +92,7 @@ static int write_image(char* filename, int width, int height, void *buffer, char
 	// Write image data
 	int i;
 	for (i = 0; i < height; i++)
-		png_write_row(png_ptr, (png_bytep)buffer + i * width * 4);
+		png_write_row(png_ptr, (png_bytep)buffer + i * stride);
 
 	// End write
 	png_write_end(png_ptr, NULL);
@@ -125,9 +126,8 @@ int dump_run(const struct gbm *gbm, const struct egl *egl)
 		result = gbm_bo_map(bo, 0, 0, DUMP_TARGET_WIDTH, DUMP_TARGET_HEIGHT,
 				    GBM_BO_TRANSFER_READ, &stride, &map_data);
 		assert(result);
-		assert(stride == DUMP_TARGET_WIDTH * 4);
 
-		assert(!write_image(name, DUMP_TARGET_WIDTH, DUMP_TARGET_HEIGHT,
+		assert(!write_image(name, DUMP_TARGET_WIDTH, DUMP_TARGET_HEIGHT, stride,
 				    result, "dump"));
 		name[4]++;
 
