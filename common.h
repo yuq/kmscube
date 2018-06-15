@@ -130,8 +130,8 @@ init_cube_video(const struct gbm *gbm, const char *video)
 }
 #endif
 
-#define DUMP_TARGET_WIDTH 1024
-#define DUMP_TARGET_HEIGHT 768
+#define DUMP_TARGET_WIDTH 260
+#define DUMP_TARGET_HEIGHT 260
 int init_dump(const char *device);
 int dump_run(const struct gbm *gbm, const struct egl *egl);
 

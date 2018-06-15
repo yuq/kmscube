@@ -23,6 +23,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "common.h"
 #include "esUtil.h"
@@ -30,192 +31,165 @@
 
 struct {
 	struct egl egl;
-
-	GLfloat aspect;
-
-	GLuint program;
-	GLint modelviewmatrix, modelviewprojectionmatrix, normalmatrix;
-	GLuint vbo;
-	GLuint positionsoffset, colorsoffset, normalsoffset;
+	GLuint program1;
+	GLuint program2;
+	GLuint fbid;
 } gl;
 
-static const GLfloat vVertices[] = {
-		// front
-		-1.0f, -1.0f, +1.0f,
-		+1.0f, -1.0f, +1.0f,
-		-1.0f, +1.0f, +1.0f,
-		+1.0f, +1.0f, +1.0f,
-		// back
-		+1.0f, -1.0f, -1.0f,
-		-1.0f, -1.0f, -1.0f,
-		+1.0f, +1.0f, -1.0f,
-		-1.0f, +1.0f, -1.0f,
-		// right
-		+1.0f, -1.0f, +1.0f,
-		+1.0f, -1.0f, -1.0f,
-		+1.0f, +1.0f, +1.0f,
-		+1.0f, +1.0f, -1.0f,
-		// left
-		-1.0f, -1.0f, -1.0f,
-		-1.0f, -1.0f, +1.0f,
-		-1.0f, +1.0f, -1.0f,
-		-1.0f, +1.0f, +1.0f,
-		// top
-		-1.0f, +1.0f, +1.0f,
-		+1.0f, +1.0f, +1.0f,
-		-1.0f, +1.0f, -1.0f,
-		+1.0f, +1.0f, -1.0f,
-		// bottom
-		-1.0f, -1.0f, -1.0f,
-		+1.0f, -1.0f, -1.0f,
-		-1.0f, -1.0f, +1.0f,
-		+1.0f, -1.0f, +1.0f,
-};
 
-static const GLfloat vColors[] = {
-		// front
-		0.0f,  0.0f,  1.0f, // blue
-		1.0f,  0.0f,  1.0f, // magenta
-		0.0f,  1.0f,  1.0f, // cyan
-		1.0f,  1.0f,  1.0f, // white
-		// back
-		1.0f,  0.0f,  0.0f, // red
-		0.0f,  0.0f,  0.0f, // black
-		1.0f,  1.0f,  0.0f, // yellow
-		0.0f,  1.0f,  0.0f, // green
-		// right
-		1.0f,  0.0f,  1.0f, // magenta
-		1.0f,  0.0f,  0.0f, // red
-		1.0f,  1.0f,  1.0f, // white
-		1.0f,  1.0f,  0.0f, // yellow
-		// left
-		0.0f,  0.0f,  0.0f, // black
-		0.0f,  0.0f,  1.0f, // blue
-		0.0f,  1.0f,  0.0f, // green
-		0.0f,  1.0f,  1.0f, // cyan
-		// top
-		0.0f,  1.0f,  1.0f, // cyan
-		1.0f,  1.0f,  1.0f, // white
-		0.0f,  1.0f,  0.0f, // green
-		1.0f,  1.0f,  0.0f, // yellow
-		// bottom
-		0.0f,  0.0f,  0.0f, // black
-		1.0f,  0.0f,  0.0f, // red
-		0.0f,  0.0f,  1.0f, // blue
-		1.0f,  0.0f,  1.0f  // magenta
-};
+GLuint LoadShader(const char *name, GLenum type)
+{
+	FILE *f;
+	int size;
+	char *buff;
+	GLuint shader;
+	GLint compiled;
+	const GLchar *source[1];
 
-static const GLfloat vNormals[] = {
-		// front
-		+0.0f, +0.0f, +1.0f, // forward
-		+0.0f, +0.0f, +1.0f, // forward
-		+0.0f, +0.0f, +1.0f, // forward
-		+0.0f, +0.0f, +1.0f, // forward
-		// back
-		+0.0f, +0.0f, -1.0f, // backward
-		+0.0f, +0.0f, -1.0f, // backward
-		+0.0f, +0.0f, -1.0f, // backward
-		+0.0f, +0.0f, -1.0f, // backward
-		// right
-		+1.0f, +0.0f, +0.0f, // right
-		+1.0f, +0.0f, +0.0f, // right
-		+1.0f, +0.0f, +0.0f, // right
-		+1.0f, +0.0f, +0.0f, // right
-		// left
-		-1.0f, +0.0f, +0.0f, // left
-		-1.0f, +0.0f, +0.0f, // left
-		-1.0f, +0.0f, +0.0f, // left
-		-1.0f, +0.0f, +0.0f, // left
-		// top
-		+0.0f, +1.0f, +0.0f, // up
-		+0.0f, +1.0f, +0.0f, // up
-		+0.0f, +1.0f, +0.0f, // up
-		+0.0f, +1.0f, +0.0f, // up
-		// bottom
-		+0.0f, -1.0f, +0.0f, // down
-		+0.0f, -1.0f, +0.0f, // down
-		+0.0f, -1.0f, +0.0f, // down
-		+0.0f, -1.0f, +0.0f  // down
-};
+	assert((f = fopen(name, "r")) != NULL);
 
-static const char *vertex_shader_source =
-		"uniform mat4 modelviewMatrix;      \n"
-		"uniform mat4 modelviewprojectionMatrix;\n"
-		"uniform mat3 normalMatrix;         \n"
-		"                                   \n"
-		"attribute vec4 in_position;        \n"
-		"attribute vec3 in_normal;          \n"
-		"attribute vec4 in_color;           \n"
-		"\n"
-		"vec4 lightSource = vec4(2.0, 2.0, 20.0, 0.0);\n"
-		"                                   \n"
-		"varying vec4 vVaryingColor;        \n"
-		"                                   \n"
-		"void main()                        \n"
-		"{                                  \n"
-		"    gl_Position = modelviewprojectionMatrix * in_position;\n"
-		"    vec3 vEyeNormal = normalMatrix * in_normal;\n"
-		"    vec4 vPosition4 = modelviewMatrix * in_position;\n"
-		"    vec3 vPosition3 = vPosition4.xyz / vPosition4.w;\n"
-		"    vec3 vLightDir = normalize(lightSource.xyz - vPosition3);\n"
-		"    float diff = max(0.0, dot(vEyeNormal, vLightDir));\n"
-		"    vVaryingColor = vec4(diff * in_color.rgb, 1.0);\n"
-		"}                                  \n";
+	// get file size
+	fseek(f, 0, SEEK_END);
+	size = ftell(f);
+	fseek(f, 0, SEEK_SET);
 
-static const char *fragment_shader_source =
-		"precision mediump float;           \n"
-		"                                   \n"
-		"varying vec4 vVaryingColor;        \n"
-		"                                   \n"
-		"void main()                        \n"
-		"{                                  \n"
-		"    gl_FragColor = vVaryingColor;  \n"
-		"}                                  \n";
+	assert((buff = malloc(size)) != NULL);
+	assert(fread(buff, 1, size, f) == size);
+	source[0] = buff;
+	fclose(f);
+	shader = glCreateShader(type);
+	glShaderSource(shader, 1, source, &size);
+	glCompileShader(shader);
+	free(buff);
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+	if (!compiled) {
+		GLint infoLen = 0;
+		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLen);
+		if (infoLen > 1) {
+			char *infoLog = malloc(infoLen);
+			glGetShaderInfoLog(shader, infoLen, NULL, infoLog);
+			fprintf(stderr, "Error compiling shader %s:\n%s\n", name, infoLog);
+			free(infoLog);
+		}
+		glDeleteShader(shader);
+		return 0;
+	}
 
+	return shader;
+}
+
+GLuint InitGLES(const char *vert, const char *frag)
+{
+	GLint linked;
+	GLuint vertexShader;
+	GLuint fragmentShader;
+	GLuint program;
+	assert((vertexShader = LoadShader(vert, GL_VERTEX_SHADER)) != 0);
+	assert((fragmentShader = LoadShader(frag, GL_FRAGMENT_SHADER)) != 0);
+	assert((program = glCreateProgram()) != 0);
+	glAttachShader(program, vertexShader);
+	glAttachShader(program, fragmentShader);
+	glLinkProgram(program);
+	glGetProgramiv(program, GL_LINK_STATUS, &linked);
+	if (!linked) {
+		GLint infoLen = 0;
+		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &infoLen);
+		if (infoLen > 1) {
+			char *infoLog = malloc(infoLen);
+			glGetProgramInfoLog(program, infoLen, NULL, infoLog);
+			fprintf(stderr, "Error linking program:\n%s\n", infoLog);
+			free(infoLog);
+		}
+		glDeleteProgram(program);
+		exit(1);
+	}
+
+	return program;
+}
+
+void CheckFrameBufferStatus(void)
+{
+  GLenum status;
+  status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+  switch(status) {
+  case GL_FRAMEBUFFER_COMPLETE:
+    printf("Framebuffer complete\n");
+    break;
+  case GL_FRAMEBUFFER_UNSUPPORTED:
+    printf("Framebuffer unsuported\n");
+    break;
+  case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+    printf("GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT\n");
+    break;
+  case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+    printf("GL_FRAMEBUFFER_MISSING_ATTACHMENT\n");
+    break;
+  case GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS:
+    printf("GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS\n");
+    break;
+  default:
+    printf("Framebuffer error\n");
+  }
+}
 
 static void draw_cube_smooth(unsigned i)
-{
-	ESMatrix modelview;
+{	
 
-	/* clear the color buffer */
-	glClearColor(0.5, 0.5, 0.5, 1.0);
+	glBindFramebuffer(GL_FRAMEBUFFER, gl.fbid);
+	glUseProgram(gl.program1);
+
+	GLfloat vertex[] = {
+		-1, -1, 0,
+		-1, 1, 0,
+		1, 1, 0,
+		1, -1, 0
+	};
+
+	GLint position = glGetAttribLocation(gl.program1, "positionIn");
+	glEnableVertexAttribArray(position);
+	glVertexAttribPointer(position, 3, GL_FLOAT, 0, 0, vertex);
+	assert(glGetError() == GL_NO_ERROR);
+
 	glClear(GL_COLOR_BUFFER_BIT);
+	assert(glGetError() == GL_NO_ERROR);
 
-	esMatrixLoadIdentity(&modelview);
-	esTranslate(&modelview, 0.0f, 0.0f, -8.0f);
-	esRotate(&modelview, 45.0f + (0.25f * i), 1.0f, 0.0f, 0.0f);
-	esRotate(&modelview, 45.0f - (0.5f * i), 0.0f, 1.0f, 0.0f);
-	esRotate(&modelview, 10.0f + (0.15f * i), 0.0f, 0.0f, 1.0f);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+	assert(glGetError() == GL_NO_ERROR);
 
-	ESMatrix projection;
-	esMatrixLoadIdentity(&projection);
-	esFrustum(&projection, -2.8f, +2.8f, -2.8f * gl.aspect, +2.8f * gl.aspect, 6.0f, 10.0f);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glUseProgram(gl.program2);
 
-	ESMatrix modelviewprojection;
-	esMatrixLoadIdentity(&modelviewprojection);
-	esMatrixMultiply(&modelviewprojection, &modelview, &projection);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-	float normal[9];
-	normal[0] = modelview.m[0][0];
-	normal[1] = modelview.m[0][1];
-	normal[2] = modelview.m[0][2];
-	normal[3] = modelview.m[1][0];
-	normal[4] = modelview.m[1][1];
-	normal[5] = modelview.m[1][2];
-	normal[6] = modelview.m[2][0];
-	normal[7] = modelview.m[2][1];
-	normal[8] = modelview.m[2][2];
+	GLfloat tex[] = {
+		1, 1,
+		1, 0,
+		0, 1,
+		0, 0,
+	};
 
-	glUniformMatrix4fv(gl.modelviewmatrix, 1, GL_FALSE, &modelview.m[0][0]);
-	glUniformMatrix4fv(gl.modelviewprojectionmatrix, 1, GL_FALSE, &modelviewprojection.m[0][0]);
-	glUniformMatrix3fv(gl.normalmatrix, 1, GL_FALSE, normal);
+	position = glGetAttribLocation(gl.program2, "positionIn");
+	glEnableVertexAttribArray(position);
+	glVertexAttribPointer(position, 3, GL_FLOAT, 0, 0, vertex);
+	assert(glGetError() == GL_NO_ERROR);
 
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-	glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
-	glDrawArrays(GL_TRIANGLE_STRIP, 8, 4);
-	glDrawArrays(GL_TRIANGLE_STRIP, 12, 4);
-	glDrawArrays(GL_TRIANGLE_STRIP, 16, 4);
-	glDrawArrays(GL_TRIANGLE_STRIP, 20, 4);
+	GLint texIn = glGetAttribLocation(gl.program2, "texIn");
+	glEnableVertexAttribArray(texIn);
+	glVertexAttribPointer(texIn, 2, GL_FLOAT, 0, 0, tex);
+	assert(glGetError() == GL_NO_ERROR);
+
+	GLint sample = glGetUniformLocation(gl.program2, "tex");
+	glUniform1i(sample, 0);
+	assert(glGetError() == GL_NO_ERROR);
+
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+	assert(glGetError() == GL_NO_ERROR);
+}
+
+static inline int
+align(int value, int alignment)
+{
+   return (value + alignment - 1) & ~(alignment - 1);
 }
 
 const struct egl * init_cube_smooth(const struct gbm *gbm)
@@ -226,47 +200,75 @@ const struct egl * init_cube_smooth(const struct gbm *gbm)
 	if (ret)
 		return NULL;
 
-	gl.aspect = (GLfloat)(gbm->height) / (GLfloat)(gbm->width);
+	gl.program1 = InitGLES("vert.glsl", "frag.glsl");
+	gl.program2 = InitGLES("vert-tex.glsl", "frag-tex.glsl");
 
-	ret = create_program(vertex_shader_source, fragment_shader_source);
-	if (ret < 0)
-		return NULL;
-
-	gl.program = ret;
-
-	glBindAttribLocation(gl.program, 0, "in_position");
-	glBindAttribLocation(gl.program, 1, "in_normal");
-	glBindAttribLocation(gl.program, 2, "in_color");
-
-	ret = link_program(gl.program);
-	if (ret)
-		return NULL;
-
-	glUseProgram(gl.program);
-
-	gl.modelviewmatrix = glGetUniformLocation(gl.program, "modelviewMatrix");
-	gl.modelviewprojectionmatrix = glGetUniformLocation(gl.program, "modelviewprojectionMatrix");
-	gl.normalmatrix = glGetUniformLocation(gl.program, "normalMatrix");
-
+	glClearColor(0, 0, 0, 0);
 	glViewport(0, 0, gbm->width, gbm->height);
-	glEnable(GL_CULL_FACE);
 
-	gl.positionsoffset = 0;
-	gl.colorsoffset = sizeof(vVertices);
-	gl.normalsoffset = sizeof(vVertices) + sizeof(vColors);
-	glGenBuffers(1, &gl.vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, gl.vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vVertices) + sizeof(vColors) + sizeof(vNormals), 0, GL_STATIC_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, gl.positionsoffset, sizeof(vVertices), &vVertices[0]);
-	glBufferSubData(GL_ARRAY_BUFFER, gl.colorsoffset, sizeof(vColors), &vColors[0]);
-	glBufferSubData(GL_ARRAY_BUFFER, gl.normalsoffset, sizeof(vNormals), &vNormals[0]);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (const GLvoid *)(intptr_t)gl.positionsoffset);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (const GLvoid *)(intptr_t)gl.normalsoffset);
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, (const GLvoid *)(intptr_t)gl.colorsoffset);
-	glEnableVertexAttribArray(2);
+	int drm_fd = gbm_device_get_fd(gbm->dev);
+	struct drm_mode_create_dumb arg = {
+	  .bpp = 32,
+	  .width = align(gbm->width, 16),
+	  .height = align(gbm->height, 16),
+	};
+	assert(!drmIoctl(drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &arg));
 
+	int dma_fd;
+	assert(!drmPrimeHandleToFD(drm_fd, arg.handle, 0, &dma_fd));
+
+	printf("pitch = %d fd = %d\n", arg.pitch, dma_fd);
+
+	EGLint attrib_list[] = {
+	  EGL_WIDTH, gbm->width,
+	  EGL_HEIGHT, gbm->height,
+	  EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_RGBA8888,
+	  EGL_DMA_BUF_PLANE0_FD_EXT, dma_fd,
+	  EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
+	  EGL_DMA_BUF_PLANE0_PITCH_EXT, arg.pitch,
+	  EGL_NONE
+	};
+	EGLImageKHR image =
+	  gl.egl.eglCreateImageKHR(
+		gl.egl.display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT,
+		NULL, attrib_list);
+	printf("egl error %x\n", eglGetError());
+	assert(image != EGL_NO_IMAGE_KHR);
+
+	/*
+	struct gbm_bo *bo = gbm_bo_create(
+		gbm->dev, gbm->width, gbm->height, 
+		GBM_FORMAT_XRGB8888, 0);
+		//GBM_BO_USE_LINEAR |
+		//GBM_BO_USE_RENDERING |
+		//GBM_BO_USE_SCANOUT);
+	assert(bo);
+	printf("gbm bo width/stride %d/%d\n",
+	       gbm_bo_get_width(bo),
+	       gbm_bo_get_stride(bo));
+	
+	EGLImageKHR image = gl.egl.eglCreateImageKHR(
+		gl.egl.display, EGL_NO_CONTEXT, EGL_NATIVE_PIXMAP_KHR, bo, NULL);
+	assert(image != EGL_NO_IMAGE_KHR);
+	*/
+
+	glActiveTexture(GL_TEXTURE0);
+
+	GLuint texid;
+	glGenTextures(1, &texid);
+	glBindTexture(GL_TEXTURE_2D, texid);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        gl.egl.glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, image);
+
+	GLuint fbid;
+	glGenFramebuffers(1, &fbid);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbid);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texid, 0);
+
+	CheckFrameBufferStatus();
+
+	gl.fbid = fbid;
 	gl.egl.draw = draw_cube_smooth;
 
 	return &gl.egl;

@@ -108,31 +108,11 @@ finalise:
 int dump_run(const struct gbm *gbm, const struct egl *egl)
 {
 	int i;
-	char name[32] = "dump0.png";
 
-	for (i = 0; i < 5; i++) {
-		uint32_t stride;
-		void *map_data = NULL;
-		GLubyte *result;
-		struct gbm_bo *bo;
-
+	for (i = 0; i < 1; i++) {
 		egl->draw(i << 4);
 
 		eglSwapBuffers(egl->display, egl->surface);
-
-		bo = gbm_surface_lock_front_buffer(gbm->surface);
-		assert(bo);
-
-		result = gbm_bo_map(bo, 0, 0, DUMP_TARGET_WIDTH, DUMP_TARGET_HEIGHT,
-				    GBM_BO_TRANSFER_READ, &stride, &map_data);
-		assert(result);
-
-		assert(!write_image(name, DUMP_TARGET_WIDTH, DUMP_TARGET_HEIGHT, stride,
-				    result, "dump"));
-		name[4]++;
-
-		gbm_bo_unmap(bo, map_data);
-		gbm_surface_release_buffer(gbm->surface, bo);
 	}
 
 	return 0;
