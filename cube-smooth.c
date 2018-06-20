@@ -31,9 +31,7 @@
 
 struct {
 	struct egl egl;
-	GLuint program1;
-	GLuint program2;
-	GLuint fbid;
+	GLuint program;
 } gl;
 
 
@@ -133,63 +131,33 @@ void CheckFrameBufferStatus(void)
 }
 
 static void draw_cube_smooth(unsigned i)
-{	
-
-	glBindFramebuffer(GL_FRAMEBUFFER, gl.fbid);
-	glUseProgram(gl.program1);
-
-	GLfloat vertex[] = {
+{
+	GLfloat vertex1[] = {
 		-1, -1, 0,
 		-1, 1, 0,
 		1, 1, 0,
 		1, -1, 0
 	};
 
-	GLint position = glGetAttribLocation(gl.program1, "positionIn");
-	glEnableVertexAttribArray(position);
-	glVertexAttribPointer(position, 3, GL_FLOAT, 0, 0, vertex);
-	assert(glGetError() == GL_NO_ERROR);
-
-	glClear(GL_COLOR_BUFFER_BIT);
-	assert(glGetError() == GL_NO_ERROR);
-
-	glDrawArrays(GL_TRIANGLES, 0, 3);
-	assert(glGetError() == GL_NO_ERROR);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glUseProgram(gl.program2);
-
-        glClear(GL_COLOR_BUFFER_BIT);
-
-	GLfloat tex[] = {
-		1, 1,
-		1, 0,
-		0, 1,
-		0, 0,
+	GLfloat vertex2[] = {
+		-1, -1, 0,
+		-1, 1, 0,
+		1, -1, 0,
+		1, 1, 0,
 	};
 
-	position = glGetAttribLocation(gl.program2, "positionIn");
+	GLint position = glGetAttribLocation(gl.program, "positionIn");
 	glEnableVertexAttribArray(position);
-	glVertexAttribPointer(position, 3, GL_FLOAT, 0, 0, vertex);
+	glVertexAttribPointer(position, 3, GL_FLOAT, 0, 0, i ? vertex2 : vertex1);
 	assert(glGetError() == GL_NO_ERROR);
 
-	GLint texIn = glGetAttribLocation(gl.program2, "texIn");
-	glEnableVertexAttribArray(texIn);
-	glVertexAttribPointer(texIn, 2, GL_FLOAT, 0, 0, tex);
-	assert(glGetError() == GL_NO_ERROR);
-
-	GLint sample = glGetUniformLocation(gl.program2, "tex");
-	glUniform1i(sample, 0);
-	assert(glGetError() == GL_NO_ERROR);
+	//if (!i) {
+	  glClear(GL_COLOR_BUFFER_BIT);
+	  assert(glGetError() == GL_NO_ERROR);
+	  //}
 
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	assert(glGetError() == GL_NO_ERROR);
-}
-
-static inline int
-align(int value, int alignment)
-{
-   return (value + alignment - 1) & ~(alignment - 1);
 }
 
 const struct egl * init_cube_smooth(const struct gbm *gbm)
@@ -200,75 +168,12 @@ const struct egl * init_cube_smooth(const struct gbm *gbm)
 	if (ret)
 		return NULL;
 
-	gl.program1 = InitGLES("vert.glsl", "frag.glsl");
-	gl.program2 = InitGLES("vert-tex.glsl", "frag-tex.glsl");
+	gl.program = InitGLES("vert.glsl", "frag.glsl");
+	glUseProgram(gl.program);
 
 	glClearColor(0, 0, 0, 0);
 	glViewport(0, 0, gbm->width, gbm->height);
 
-	int drm_fd = gbm_device_get_fd(gbm->dev);
-	struct drm_mode_create_dumb arg = {
-	  .bpp = 32,
-	  .width = align(gbm->width, 16),
-	  .height = align(gbm->height, 16),
-	};
-	assert(!drmIoctl(drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &arg));
-
-	int dma_fd;
-	assert(!drmPrimeHandleToFD(drm_fd, arg.handle, 0, &dma_fd));
-
-	printf("pitch = %d fd = %d\n", arg.pitch, dma_fd);
-
-	EGLint attrib_list[] = {
-	  EGL_WIDTH, gbm->width,
-	  EGL_HEIGHT, gbm->height,
-	  EGL_LINUX_DRM_FOURCC_EXT, DRM_FORMAT_RGBA8888,
-	  EGL_DMA_BUF_PLANE0_FD_EXT, dma_fd,
-	  EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
-	  EGL_DMA_BUF_PLANE0_PITCH_EXT, arg.pitch,
-	  EGL_NONE
-	};
-	EGLImageKHR image =
-	  gl.egl.eglCreateImageKHR(
-		gl.egl.display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT,
-		NULL, attrib_list);
-	printf("egl error %x\n", eglGetError());
-	assert(image != EGL_NO_IMAGE_KHR);
-
-	/*
-	struct gbm_bo *bo = gbm_bo_create(
-		gbm->dev, gbm->width, gbm->height, 
-		GBM_FORMAT_XRGB8888, 0);
-		//GBM_BO_USE_LINEAR |
-		//GBM_BO_USE_RENDERING |
-		//GBM_BO_USE_SCANOUT);
-	assert(bo);
-	printf("gbm bo width/stride %d/%d\n",
-	       gbm_bo_get_width(bo),
-	       gbm_bo_get_stride(bo));
-	
-	EGLImageKHR image = gl.egl.eglCreateImageKHR(
-		gl.egl.display, EGL_NO_CONTEXT, EGL_NATIVE_PIXMAP_KHR, bo, NULL);
-	assert(image != EGL_NO_IMAGE_KHR);
-	*/
-
-	glActiveTexture(GL_TEXTURE0);
-
-	GLuint texid;
-	glGenTextures(1, &texid);
-	glBindTexture(GL_TEXTURE_2D, texid);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        gl.egl.glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, image);
-
-	GLuint fbid;
-	glGenFramebuffers(1, &fbid);
-	glBindFramebuffer(GL_FRAMEBUFFER, fbid);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texid, 0);
-
-	CheckFrameBufferStatus();
-
-	gl.fbid = fbid;
 	gl.egl.draw = draw_cube_smooth;
 
 	return &gl.egl;

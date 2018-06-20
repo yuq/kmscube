@@ -108,11 +108,20 @@ finalise:
 int dump_run(const struct gbm *gbm, const struct egl *egl)
 {
 	int i;
+	char name[32] = "dump0.png";
 
-	for (i = 0; i < 1; i++) {
-		egl->draw(i << 4);
+	for (i = 0; i < 2; i++) {
+		egl->draw(i);
 
-		eglSwapBuffers(egl->display, egl->surface);
+		//eglSwapBuffers(egl->display, egl->surface);
+		glFlush();
+		GLubyte result[256 * 256 * 4] = {0};
+		glReadPixels(0, 0, gbm->width, gbm->height, GL_RGBA, GL_UNSIGNED_BYTE, result);
+		printf("error %x %d/%d\n", glGetError(), gbm->width, gbm->height);
+		assert(glGetError() == GL_NO_ERROR);
+
+		assert(!write_image(name, gbm->width, gbm->height, gbm->width * 4, result, "hello"));
+		name[4]++;
 	}
 
 	return 0;
