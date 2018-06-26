@@ -32,6 +32,7 @@
 struct {
 	struct egl egl;
 	GLuint program;
+	struct gbm *gbm;
 } gl;
 
 
@@ -132,32 +133,74 @@ void CheckFrameBufferStatus(void)
 
 static void draw_cube_smooth(unsigned i)
 {
-	GLfloat vertex1[] = {
-		-1, -1, 0,
-		-1, 1, 0,
-		1, 1, 0,
-		1, -1, 0
-	};
+  GLfloat vertex[][9] = {
+    {
+      -1, -1, 0,
+      -1, 1, 0,
+      1, 1, 0,
+    },
+    {
+      -1, -1, 0,
+      -1, 1, 0,
+      1, -1, 0,
+    },
+    {
+      1, -1, 0,
+      1, 1, 0,
+      -1, 1, 0,
+    },
+    {
+      1, -1, 0,
+      1, 1, 0,
+      -1, -1, 0,
+    },
+  };
 
-	GLfloat vertex2[] = {
-		-1, -1, 0,
-		-1, 1, 0,
-		1, -1, 0,
-		1, 1, 0,
-	};
+  EGLint rect[] = { gl.gbm->width/4 - 1, gl.gbm->height/4 - 1, gl.gbm->width/2 + 2, gl.gbm->height/2 + 2};
+  assert(gl.egl.eglSetDamageRegionKHR(gl.egl.display, gl.egl.surface, rect, 1) == EGL_TRUE);
 
-	GLint position = glGetAttribLocation(gl.program, "positionIn");
-	glEnableVertexAttribArray(position);
-	glVertexAttribPointer(position, 3, GL_FLOAT, 0, 0, i ? vertex2 : vertex1);
-	assert(glGetError() == GL_NO_ERROR);
+  if (!i) {
+    //glViewport(0, 0, gl.gbm->width, gl.gbm->height);
+    //glScissor(0, 0, gl.gbm->width, gl.gbm->height);
 
-	//if (!i) {
-	  glClear(GL_COLOR_BUFFER_BIT);
-	  assert(glGetError() == GL_NO_ERROR);
-	  //}
+    //glClear(GL_COLOR_BUFFER_BIT);
+    assert(glGetError() == GL_NO_ERROR);
 
-	glDrawArrays(GL_TRIANGLES, 0, 3);
-	assert(glGetError() == GL_NO_ERROR);
+    GLint position = glGetAttribLocation(gl.program, "positionIn");
+    glEnableVertexAttribArray(position);
+    glVertexAttribPointer(position, 3, GL_FLOAT, 0, 0, vertex[0]);
+    assert(glGetError() == GL_NO_ERROR);
+
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    assert(glGetError() == GL_NO_ERROR);
+
+    glVertexAttribPointer(position, 3, GL_FLOAT, 0, 0, vertex[1]);
+    assert(glGetError() == GL_NO_ERROR);
+
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    assert(glGetError() == GL_NO_ERROR);
+  }
+  else {
+    //glViewport(gl.gbm->width/4, gl.gbm->height/4, gl.gbm->width/2, gl.gbm->height/2);
+    //glScissor(gl.gbm->width/4, gl.gbm->height/4, gl.gbm->width/2, gl.gbm->height/2);
+
+    //glClear(GL_COLOR_BUFFER_BIT);
+    assert(glGetError() == GL_NO_ERROR);
+
+    GLint position = glGetAttribLocation(gl.program, "positionIn");
+    glEnableVertexAttribArray(position);
+    glVertexAttribPointer(position, 3, GL_FLOAT, 0, 0, vertex[2]);
+    assert(glGetError() == GL_NO_ERROR);
+
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    assert(glGetError() == GL_NO_ERROR);
+
+    glVertexAttribPointer(position, 3, GL_FLOAT, 0, 0, vertex[3]);
+    assert(glGetError() == GL_NO_ERROR);
+
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    assert(glGetError() == GL_NO_ERROR);
+  }
 }
 
 const struct egl * init_cube_smooth(const struct gbm *gbm)
@@ -172,9 +215,10 @@ const struct egl * init_cube_smooth(const struct gbm *gbm)
 	glUseProgram(gl.program);
 
 	glClearColor(0, 0, 0, 0);
-	glViewport(0, 0, gbm->width, gbm->height);
+	glEnable(GL_SCISSOR_TEST);
 
 	gl.egl.draw = draw_cube_smooth;
+	gl.gbm = gbm;
 
 	return &gl.egl;
 }

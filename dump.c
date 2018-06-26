@@ -110,11 +110,15 @@ int dump_run(const struct gbm *gbm, const struct egl *egl)
 	int i;
 	char name[32] = "dump0.png";
 
-	for (i = 0; i < 2; i++) {
-		egl->draw(i);
+	for (i = 0; i < 8; i++) {
+	  EGLint age;
+	  assert(eglQuerySurface(egl->display, egl->surface, EGL_BUFFER_AGE_KHR, &age) == EGL_TRUE);
+	  printf("age = %d\n", age);
 
-		//eglSwapBuffers(egl->display, egl->surface);
-		glFlush();
+	  egl->draw(i);
+
+		eglSwapBuffers(egl->display, egl->surface);
+		//glFlush();
 		GLubyte result[256 * 256 * 4] = {0};
 		glReadPixels(0, 0, gbm->width, gbm->height, GL_RGBA, GL_UNSIGNED_BYTE, result);
 		printf("error %x %d/%d\n", glGetError(), gbm->width, gbm->height);
